@@ -139,6 +139,11 @@ function pickBestVoice() {
   return cachedVoice;
 }
 
+/** Where Supabase magic links should return (must be allowlisted in Supabase dashboard). */
+function authRedirectUrl() {
+  return `${window.location.origin}${window.location.pathname}`;
+}
+
 function speak(text) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   const synth = window.speechSynthesis;
@@ -210,9 +215,15 @@ export default function App() {
       setSession(session);
       setAuthLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setAuthLoading(false);
+      if (
+        (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY')
+        && window.location.hash.includes('access_token')
+      ) {
+        window.history.replaceState(null, '', authRedirectUrl());
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -357,7 +368,7 @@ export default function App() {
     setAuthError(null);
     const { error } = await supabase.auth.signInWithOtp({
       email: authEmail,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: authRedirectUrl() },
     });
     if (error) setAuthError(error.message);
     else setAuthSent(true);
@@ -390,6 +401,15 @@ export default function App() {
             <form onSubmit={sendMagicLink}>
               <p className="auth-form-text">
                 Sign in to sync your learning across devices.
+              </p>
+              <p className="auth-redirect-hint">
+                Magic link will open: <strong>{authRedirectUrl()}</strong>
+                {import.meta.env.DEV && (
+                  <>
+                    {' '}
+                    — add this URL in Supabase → Authentication → URL Configuration → Redirect URLs.
+                  </>
+                )}
               </p>
               <input
                 type="email"
@@ -536,6 +556,7 @@ export default function App() {
                   disabled={loading}
                 />
               </form>
+              <div className="daily-tip-slot" aria-hidden />
             </section>
           )}
 

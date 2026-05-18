@@ -10,7 +10,7 @@ export default function SentenceBreakdown({ data, sentence }) {
   const [tab, setTab] = useState('hardWords');
 
   return (
-    <article className="article card fade-in">
+    <article className="card fade-in slide-up">
       <p className="breakdown-quote">&quot;{sentence}&quot;</p>
 
       <section className="card breakdown-section">

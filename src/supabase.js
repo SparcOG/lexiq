@@ -7,4 +7,10 @@ if (!url || !key) {
   throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY');
 }
 
-export const supabase = createClient(url, key);
+export const supabase = createClient(url, key, {
+  auth: {
+    detectSessionInUrl: true,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
