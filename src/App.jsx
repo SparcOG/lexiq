@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Search, Volume2, History, Eye, EyeOff, Loader2, Sparkles,
-  Send, MessageCircle, AlertCircle,
+  Send, MessageCircle, AlertCircle, SpellCheck,
 } from 'lucide-react';
 import { supabase } from './supabase.js';
 import SentenceBreakdown from './SentenceBreakdown.jsx';
+import GrammarCheck from './GrammarCheck.jsx';
 // -----------------------------------------------------------------------------
 // Lexiq — English learning tool
 // Uses Haiku for everything (cheap). Real API via /api/lookup and /api/chat.
-// Run: `npx vercel dev` (no global install needed).
+// Run: `npm run dev` (Vercel dev — frontend + API, hot reload).
 // -----------------------------------------------------------------------------
 
 const LEVELS = [
@@ -182,6 +183,7 @@ export default function App() {
   });
 
   const [sentenceData, setSentenceData] = useState(null);
+  const [grammarMode, setGrammarMode] = useState(false);
 
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
@@ -260,6 +262,12 @@ export default function App() {
     try {
       const data = await apiBreakdown(sentence);
       setSentenceData(data);
+      setHistory((h) => {
+        const updated = [sentence, ...h.filter((s) => s.toLowerCase() !== sentence.toLowerCase())].slice(0, 20);
+        try { localStorage.setItem('lexiq:history', JSON.stringify(updated)); } catch {}
+        if (session) dbSaveHistory(session.access_token, updated);
+        return updated;
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -320,6 +328,7 @@ export default function App() {
     if (e) e.preventDefault();
     const w = input.trim();
     if (!w || loading) return;
+    setGrammarMode(false);
     if (w.includes(' ')) doBreakdown(w);
     else doLookup(w, level);
   }
@@ -327,7 +336,8 @@ export default function App() {
   function pickFromHistory(w) {
     setInput(w);
     setSidebarOpen(false);
-    doLookup(w, level);
+    if (w.includes(' ')) doBreakdown(w);
+    else doLookup(w, level);
   }
 
   function onLevelChange(newLevel) {
@@ -454,6 +464,20 @@ export default function App() {
         <div className="header-actions">
           <button
             type="button"
+            className={`btn-icon${grammarMode ? ' btn-icon--active' : ''}`}
+            onClick={() => {
+              setGrammarMode((v) => !v);
+              setWordData(null);
+              setSentenceData(null);
+              setError(null);
+            }}
+            title="Grammar check"
+          >
+            <SpellCheck size={14} aria-hidden />
+            Grammar
+          </button>
+          <button
+            type="button"
             className="btn-icon btn-history"
             onClick={() => setSidebarOpen((v) => !v)}
             aria-expanded={sidebarOpen}
@@ -539,7 +563,7 @@ export default function App() {
             </div>
           )}
 
-          {!loading && !wordData && !sentenceData && !error && (
+          {!grammarMode && !loading && !wordData && !sentenceData && !error && (
             <section className="search-hero fade-in">
               <h2 className="search-hero__title">Start learning</h2>
               <p className="search-hero__subtitle">
@@ -560,11 +584,19 @@ export default function App() {
             </section>
           )}
 
-          {!loading && sentenceData && (
-            <SentenceBreakdown data={sentenceData} sentence={input.trim()} />
+          {grammarMode && !loading && (
+            <GrammarCheck />
           )}
 
-          {!loading && wordData && (
+          {!grammarMode && !loading && sentenceData && (
+            <SentenceBreakdown
+              data={sentenceData}
+              sentence={input.trim()}
+              onWordClick={(word) => { setInput(word); doLookup(word, level); }}
+            />
+          )}
+
+          {!grammarMode && !loading && wordData && (
             <article key={wordData.word} className="card fade-in">
               <div className="word-header">
                 <h2 className="word-title">{wordData.word}</h2>
